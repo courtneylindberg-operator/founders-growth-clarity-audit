@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Operational Audit — Courtney Lindberg</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f5f4f0;
+    --text-primary: #1a1a1a;
+    --text-secondary: #6b6b6b;
+    --text-tertiary: #a0a0a0;
+    --border-light: rgba(0,0,0,0.1);
+    --border-mid: rgba(0,0,0,0.18);
+    --radius-md: 8px;
+    --radius-lg: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg-primary: #1e1e1e;
+      --bg-secondary: #2a2a2a;
+      --text-primary: #f0f0f0;
+      --text-secondary: #a0a0a0;
+      --text-tertiary: #6b6b6b;
+      --border-light: rgba(255,255,255,0.1);
+      --border-mid: rgba(255,255,255,0.18);
+    }
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    padding: 2rem 1rem 4rem;
+  }
+  .wrap { max-width: 700px; margin: 0 auto; }
+  .cl-header { padding-bottom: 1.5rem; margin-bottom: 2rem; border-bottom: 0.5px solid var(--border-light); }
+  .cl-eyebrow { font-size: 12px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 8px; }
+  .cl-title { font-size: 26px; font-weight: 600; line-height: 1.3; margin-bottom: 8px; }
+  .cl-sub { font-size: 15px; color: var(--text-secondary); line-height: 1.65; }
+  .phase-bar { display: flex; gap: 4px; margin-bottom: 1rem; }
+  .phase-dot { flex: 1; height: 3px; border-radius: 2px; background: var(--border-light); transition: background 0.4s; }
+  .phase-dot.done { background: var(--text-primary); }
+  .phase-dot.active { background: var(--text-secondary); }
+  .phase-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 1.5rem; }
+  .chat-window { display: flex; flex-direction: column; gap: 16px; margin-bottom: 1.5rem; min-height: 120px; }
+  .bubble { max-width: 88%; padding: 12px 16px; border-radius: var(--radius-lg); font-size: 15px; line-height: 1.65; animation: popIn 0.25s ease; white-space: pre-wrap; }
+  @keyframes popIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  .bubble.ai { background: var(--bg-primary); color: var(--text-primary); align-self: flex-start; border-bottom-left-radius: 4px; border: 0.5px solid var(--border-light); }
+  .bubble.user { background: var(--text-primary); color: var(--bg-primary); align-self: flex-end; border-bottom-right-radius: 4px; }
+  .bubble.typing { background: var(--bg-primary); align-self: flex-start; padding: 14px 18px; border: 0.5px solid var(--border-light); border-radius: var(--radius-lg); border-bottom-left-radius: 4px; }
+  .dots { display: flex; gap: 5px; align-items: center; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-tertiary); animation: bounce 1.2s infinite; }
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-5px); } }
+  .input-area { border-top: 0.5px solid var(--border-light); padding-top: 1.25rem; }
+  .choice-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 1rem; }
+  .choice-btn { padding: 11px 15px; border: 0.5px solid var(--border-mid); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font-size: 14px; cursor: pointer; text-align: left; transition: all 0.15s; line-height: 1.4; font-family: inherit; }
+  .choice-btn:hover { background: var(--bg-secondary); }
+  .scale-row { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+  .scale-btn { flex: 1; min-width: 36px; padding: 9px 4px; border: 0.5px solid var(--border-mid); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font-size: 13px; font-weight: 500; cursor: pointer; text-align: center; transition: all 0.15s; font-family: inherit; }
+  .scale-btn:hover { background: var(--bg-secondary); }
+  .scale-btn.selected { background: var(--text-primary); color: var(--bg-primary); border-color: var(--text-primary); }
+  .scale-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-tertiary); margin-bottom: 1rem; }
+  textarea { width: 100%; min-height: 90px; padding: 11px 13px; border: 0.5px solid var(--border-mid); border-radius: var(--radius-md); font-size: 15px; font-family: inherit; color: var(--text-primary); background: var(--bg-primary); resize: vertical; margin-bottom: 10px; line-height: 1.6; }
+  textarea:focus { outline: none; border-color: var(--text-secondary); }
+  input[type=text], input[type=email] { width: 100%; padding: 10px 13px; border: 0.5px solid var(--border-mid); border-radius: var(--radius-md); font-size: 15px; font-family: inherit; color: var(--text-primary); background: var(--bg-primary); margin-bottom: 10px; }
+  input:focus { outline: none; border-color: var(--text-secondary); }
+  .btn-primary { padding: 10px 24px; border: none; border-radius: var(--radius-md); background: var(--text-primary); color: var(--bg-primary); font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; transition: opacity 0.15s; }
+  .btn-primary:hover { opacity: 0.82; }
+  .btn-primary:disabled { opacity: 0.3; cursor: not-allowed; }
+  .report-wrap { display: none; }
+  .report-header { margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 0.5px solid var(--border-light); }
+  .report-eyebrow { font-size: 12px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 6px; }
+  .report-title { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
+  .report-sub { font-size: 15px; color: var(--text-secondary); line-height: 1.65; }
+  .overall-score { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; margin-bottom: 2rem; }
+  .score-tile { background: var(--bg-primary); border: 0.5px solid var(--border-light); border-radius: var(--radius-md); padding: 1rem; text-align: center; }
+  .score-tile-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+  .score-tile-val { font-size: 26px; font-weight: 600; }
+  .score-tile-val.red { color: #A32D2D; }
+  .score-tile-val.amber { color: #854F0B; }
+  .score-tile-val.green { color: #3B6D11; }
+  .dept-grid { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem; }
+  .dept-card { background: var(--bg-primary); border: 0.5px solid var(--border-light); border-radius: var(--radius-lg); overflow: hidden; }
+  .dept-header { display: flex; align-items: center; gap: 12px; padding: 1rem 1.25rem; cursor: pointer; }
+  .dept-icon { width: 32px; height: 32px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+  .dept-icon.red { background: #FCEBEB; }
+  .dept-icon.amber { background: #FAEEDA; }
+  .dept-icon.green { background: #EAF3DE; }
+  .dept-name { font-size: 15px; font-weight: 500; flex: 1; }
+  .dept-score-pill { font-size: 12px; font-weight: 500; padding: 3px 10px; border-radius: 20px; }
+  .dept-score-pill.red { background: #FCEBEB; color: #A32D2D; }
+  .dept-score-pill.amber { background: #FAEEDA; color: #854F0B; }
+  .dept-score-pill.green { background: #EAF3DE; color: #3B6D11; }
+  .dept-chevron { font-size: 12px; color: var(--text-tertiary); margin-left: 4px; transition: transform 0.2s; }
+  .dept-chevron.open { transform: rotate(180deg); }
+  .dept-body { display: none; padding: 0 1.25rem 1.25rem; border-top: 0.5px solid var(--border-light); }
+  .dept-body.open { display: block; }
+  .dept-score-bar-wrap { margin: 1rem 0 0.75rem; }
+  .dept-score-track { height: 4px; background: var(--border-light); border-radius: 2px; }
+  .dept-score-fill { height: 100%; border-radius: 2px; }
+  .dept-score-fill.red { background: #E24B4A; }
+  .dept-score-fill.amber { background: #EF9F27; }
+  .dept-score-fill.green { background: #639922; }
+  .dept-analysis { font-size: 14px; line-height: 1.75; margin-bottom: 0.75rem; }
+  .dept-cta { font-size: 13px; color: var(--text-secondary); font-style: italic; line-height: 1.6; padding: 10px 12px; background: var(--bg-secondary); border-radius: var(--radius-md); }
+  .insight-block { border: 0.5px solid var(--border-light); border-radius: var(--radius-lg); padding: 1.25rem; margin-bottom: 1rem; background: var(--bg-primary); }
+  .insight-label { font-size: 12px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 10px; }
+  .insight-text { font-size: 15px; line-height: 1.75; }
+  .courtney-card { border: 0.5px solid var(--border-light); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 2rem; background: var(--bg-primary); }
+  .courtney-card-top { padding: 1.5rem 1.5rem 1.25rem; }
+  .courtney-intro-row { display: flex; align-items: center; gap: 14px; margin-bottom: 1.25rem; }
+  .courtney-avatar { width: 48px; height: 48px; border-radius: 50%; background: var(--bg-secondary); border: 0.5px solid var(--border-light); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; color: var(--text-secondary); flex-shrink: 0; }
+  .courtney-name { font-size: 16px; font-weight: 600; }
+  .courtney-role { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
+  .courtney-bio { font-size: 15px; line-height: 1.8; margin-bottom: 1.25rem; }
+  .results-divider { height: 0.5px; background: var(--border-light); margin: 0 1.5rem; }
+  .results-label { font-size: 12px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-secondary); padding: 1.25rem 1.5rem 0.75rem; }
+  .results-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1px; background: var(--border-light); border-top: 0.5px solid var(--border-light); }
+  .result-stat { background: var(--bg-primary); padding: 1rem 1.25rem; }
+  .result-stat-num { font-size: 22px; font-weight: 600; margin-bottom: 3px; }
+  .result-stat-label { font-size: 13px; color: var(--text-secondary); line-height: 1.4; }
+  .cta-block { background: var(--bg-secondary); border-radius: var(--radius-lg); padding: 1.5rem; margin-bottom: 2rem; }
+  .cta-title { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
+  .cta-text { font-size: 14px; color: var(--text-secondary); line-height: 1.75; margin-bottom: 1.25rem; }
+  .btn-book { display: block; padding: 13px 24px; background: var(--text-primary); color: var(--bg-primary); border: none; border-radius: var(--radius-md); font-size: 15px; font-weight: 500; cursor: pointer; font-family: inherit; text-align: center; text-decoration: none; margin-bottom: 12px; }
+  .email-row { display: flex; gap: 10px; }
+  .email-row input { margin-bottom: 0; }
+  .btn-send-sm { padding: 10px 18px; border: none; border-radius: var(--radius-md); background: var(--text-primary); color: var(--bg-primary); font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; white-space: nowrap; }
+  .send-note { font-size: 12px; color: var(--text-tertiary); margin-top: 8px; }
+  .thankyou { display: none; text-align: center; padding: 3rem 1rem; }
+  .ty-check { width: 50px; height: 50px; border-radius: 50%; background: var(--bg-secondary); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; }
+  .ty-title { font-size: 20px; font-weight: 600; margin-bottom: 10px; }
+  .ty-text { font-size: 15px; color: var(--text-secondary); line-height: 1.75; margin-bottom: 1.5rem; max-width: 480px; margin-left: auto; margin-right: auto; }
+  .ty-book-btn { display: inline-block; padding: 12px 28px; border: 0.5px solid var(--border-mid); border-radius: var(--radius-md); font-size: 15px; font-weight: 500; text-decoration: none; color: var(--text-primary); }
+  @media (max-width: 520px) {
+    .overall-score { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .results-grid { grid-template-columns: 1fr; }
+    .email-row { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="cl-header">
+    <div class="cl-eyebrow">Courtney Lindberg</div>
+    <div class="cl-title">Operational audit</div>
+    <div class="cl-sub">An adaptive, AI-guided assessment across every department in your business. You'll walk away with a scored snapshot, written diagnosis, and a clear picture of what needs to change — and what to tackle first.</div>
+  </div>
+
+  <div id="audit-body">
+    <div class="phase-bar" id="phase-bar"></div>
+    <div class="phase-label" id="phase-label">Getting started</div>
+    <div class="chat-window" id="chat-window"></div>
+    <div class="input-area" id="input-area"></div>
+  </div>
+
+  <div class="report-wrap" id="report-wrap">
+    <div class="report-header">
+      <div class="report-eyebrow">Your operational audit</div>
+      <div class="report-title" id="rep-title">Generating your report...</div>
+      <div class="report-sub" id="rep-sub"></div>
+    </div>
+    <div class="overall-score">
+      <div class="score-tile"><div class="score-tile-label">Overall health</div><div class="score-tile-val" id="ov-health">—</div></div>
+      <div class="score-tile"><div class="score-tile-label">Highest risk area</div><div class="score-tile-val" style="font-size:15px;padding-top:4px;" id="ov-risk">—</div></div>
+      <div class="score-tile"><div class="score-tile-label">Biggest opportunity</div><div class="score-tile-val" style="font-size:15px;padding-top:4px;" id="ov-opp">—</div></div>
+    </div>
+    <div class="dept-grid" id="dept-grid"></div>
+    <div class="insight-block">
+      <div class="insight-label">Strategic diagnosis</div>
+      <div class="insight-text" id="strategic-diag"></div>
+    </div>
+    <div class="insight-block" style="margin-bottom:2rem;">
+      <div class="insight-label">Your 90-day operating priority</div>
+      <div class="insight-text" id="ninety-day"></div>
+    </div>
+    <div class="courtney-card">
+      <div class="courtney-card-top">
+        <div class="courtney-intro-row">
+          <div class="courtney-avatar">CL</div>
+          <div>
+            <div class="courtney-name">Courtney Lindberg</div>
+            <div class="courtney-role">Fractional COO · Operations Advisor · Atlanta, GA</div>
+          </div>
+        </div>
+        <div class="courtney-bio" id="courtney-bio"></div>
+      </div>
+      <div class="results-divider"></div>
+      <div class="results-label">A few things she's helped build</div>
+      <div class="results-grid">
+        <div class="result-stat"><div class="result-stat-num">150%</div><div class="result-stat-label">Revenue increase per consulting engagement through delivery redesign</div></div>
+        <div class="result-stat"><div class="result-stat-num">47%</div><div class="result-stat-label">Reduction in client success labor costs — $130K saved annually</div></div>
+        <div class="result-stat"><div class="result-stat-num">$600K</div><div class="result-stat-label">In Q1 new contracts supported by a unified revenue operating system</div></div>
+        <div class="result-stat"><div class="result-stat-num">400%</div><div class="result-stat-label">Early-stage growth bootstrapping a mission-driven company from $100 to $60K revenue</div></div>
+        <div class="result-stat"><div class="result-stat-num">22%</div><div class="result-stat-label">Operational efficiency gains through SOP installation across multiple locations</div></div>
+        <div class="result-stat"><div class="result-stat-num">33%</div><div class="result-stat-label">Boost in team confidence scores through structured accountability and development</div></div>
+      </div>
+    </div>
+    <div class="cta-block">
+      <div class="cta-title">Ready to close the gap?</div>
+      <div class="cta-text" id="cta-text"></div>
+      <a class="btn-book" href="https://calendly.com/courtney-lindberg/30min" target="_blank">Book a call with Courtney</a>
+      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:10px;">Or send your full audit report directly to her inbox</div>
+      <div class="email-row">
+        <input type="email" id="sender-email" placeholder="Your email address">
+        <button class="btn-send-sm" onclick="sendReport()">Send report</button>
+      </div>
+      <div class="send-note">Courtney reviews every audit personally and will follow up with her perspective.</div>
+    </div>
+  </div>
+
+  <div class="thankyou" id="thankyou">
+    <div class="ty-check">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+    </div>
+    <div class="ty-title">Report sent.</div>
+    <div class="ty-text">Courtney will review your audit personally and reach out with her perspective. If you'd like to move faster, grab time on her calendar directly.</div>
+    <a class="ty-book-btn" href="https://calendly.com/courtney-lindberg/30min" target="_blank">Book a call with Courtney</a>
+  </div>
+</div>
+
+<script>
+const DEPARTMENTS = [
+  { id:'leadership', name:'Leadership & decision-making', icon:'◈' },
+  { id:'strategy',   name:'Strategy & planning',          icon:'◎' },
+  { id:'sales',      name:'Sales & revenue',              icon:'◇' },
+  { id:'marketing',  name:'Marketing & pipeline',         icon:'◉' },
+  { id:'delivery',   name:'Delivery & fulfillment',       icon:'◫' },
+  { id:'finance',    name:'Finance & cash flow',          icon:'◑' },
+  { id:'people',     name:'People & team',                icon:'◐' },
+  { id:'cx',         name:'Customer experience & retention', icon:'◒' },
+  { id:'technology', name:'Technology & tools',           icon:'◓' },
+];
+
+const SYSTEM_PROMPT = `You are conducting an adaptive operational audit on behalf of Courtney Lindberg, a fractional COO and operations advisor based in Atlanta. You speak as a warm, knowledgeable advisor — not a consultant. You draw naturally (not formulaically) on frameworks from John Maxwell (5 levels of leadership, leadership laws), Patrick Lencioni (5 dysfunctions, organizational health), Gino Wickman/EOS/Traction, Michael Gerber/E-Myth (working ON vs IN the business, systems), and Jim Collins & Jerry Porras (Good to Great, Built to Last — hedgehog concept, BHAGs, clock-building vs time-telling).
+
+Tone: Warm, direct, and honest. Like a trusted advisor who has seen this before. Tell founders the truth with care. Use plain language. Avoid jargon. Reflect back what they've actually shared.
+
+Conduct the audit phase by phase — one department at a time. For each:
+1. Ask 2–4 intelligent, adaptive questions in real conversation (not all at once)
+2. Go deeper where there are obvious gaps; move faster where things are healthy
+3. Reference frameworks only when they genuinely fit — never force them
+4. Occasionally name what you're seeing forming, like a real advisor would
+
+When you have enough to score a department (after 2–4 exchanges), append this JSON block at the END of your message — after your conversational response:
+<score>{"dept":"leadership","score":4,"color":"red","analysis":"2–3 sentence written diagnosis specific to what they shared. Be concrete, not generic.","cta":"One sentence on where fractional operational support specifically helps here — written naturally, not as a sales line."}</score>
+
+Score 1–10: 1–4 = red (critical gaps), 5–7 = amber (developing), 8–10 = green (strong).
+
+After ALL 9 departments are scored, append this final block:
+<final>{"title":"One honest headline about their overall operational reality","subtitle":"One warm sentence framing the full picture","overallScore":5,"highestRisk":"Department name","biggestOpportunity":"Department name","strategicDiagnosis":"3–4 sentences drawing patterns across the whole business. Reference relevant frameworks naturally. Name what's really going on.","ninetyDay":"A specific 90-day operating priority — 3 concrete moves written as a short paragraph, not a list.","courtneyBio":"2–3 sentences written in third person, warm and grounded — about Courtney's heart for this work and her belief that every founder deserves a business that runs without them carrying it alone. Rooted in service, not selling. Should feel like a genuine introduction, not a pitch.","ctaText":"2–3 sentences specific to THIS founder's audit results. Name what you saw. Explain why execution support matters for their exact situation. End with genuine warmth — an invitation, not a close."}</final>`;
+
+const state = {
+  messages: [], deptScores: {}, currentDept: 0,
+  founderName: '', bizContext: '', reportData: null,
+};
+
+function colorClass(s) { return s <= 4 ? 'red' : s <= 7 ? 'amber' : 'green'; }
+
+function buildPhaseDots() {
+  const bar = document.getElementById('phase-bar');
+  bar.innerHTML = '';
+  DEPARTMENTS.forEach((d, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'phase-dot';
+    dot.id = 'pdot-' + i;
+    bar.appendChild(dot);
+  });
+}
+
+function updatePhase() {
+  DEPARTMENTS.forEach((d, i) => {
+    const dot = document.getElementById('pdot-' + i);
+    if (!dot) return;
+    dot.className = 'phase-dot';
+    if (state.deptScores[d.id]) dot.classList.add('done');
+    else if (i === state.currentDept) dot.classList.add('active');
+  });
+  const done = Object.keys(state.deptScores).length;
+  if (done < DEPARTMENTS.length) {
+    document.getElementById('phase-label').textContent = `Area ${done + 1} of ${DEPARTMENTS.length} — ${DEPARTMENTS[state.currentDept].name}`;
+  } else {
+    document.getElementById('phase-label').textContent = 'Generating your report...';
+  }
+}
+
+function addBubble(text, role) {
+  const win = document.getElementById('chat-window');
+  const b = document.createElement('div');
+  b.className = 'bubble ' + role;
+  b.textContent = text;
+  win.appendChild(b);
+  win.scrollTop = win.scrollHeight;
+}
+
+function showTyping() {
+  const win = document.getElementById('chat-window');
+  const b = document.createElement('div');
+  b.className = 'bubble typing';
+  b.id = 'typing-ind';
+  b.innerHTML = '<div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
+  win.appendChild(b);
+  win.scrollTop = win.scrollHeight;
+}
+
+function removeTyping() { const t = document.getElementById('typing-ind'); if (t) t.remove(); }
+function clearInput() { document.getElementById('input-area').innerHTML = ''; }
+
+function showTextInput(onSubmit) {
+  const area = document.getElementById('input-area');
+  area.innerHTML = '';
+  const ta = document.createElement('textarea');
+  ta.placeholder = 'Your response...';
+  const btn = document.createElement('button');
+  btn.className = 'btn-primary';
+  btn.textContent = 'Send';
+  btn.onclick = () => { const v = ta.value.trim(); if (v) onSubmit(v); };
+  ta.onkeydown = e => { if (e.key === 'Enter' && e.metaKey) btn.click(); };
+  area.appendChild(ta);
+  area.appendChild(btn);
+  ta.focus();
+}
+
+function showNameInput(onSubmit) {
+  const area = document.getElementById('input-area');
+  area.innerHTML = '';
+  const nameIn = document.createElement('input');
+  nameIn.type = 'text';
+  nameIn.placeholder = 'Your name';
+  const bizTa = document.createElement('textarea');
+  bizTa.placeholder = "Briefly describe your business — what you do, who you serve, how long you've been operating...";
+  bizTa.style.marginTop = '10px';
+  const btn = document.createElement('button');
+  btn.className = 'btn-primary';
+  btn.textContent = 'Begin audit';
+  btn.onclick = () => {
+    const name = nameIn.value.trim();
+    const biz = bizTa.value.trim();
+    if (name && biz) onSubmit(name, biz);
+  };
+  area.appendChild(nameIn);
+  area.appendChild(bizTa);
+  area.appendChild(btn);
+  nameIn.focus();
+}
+
+function parseBlock(text, tag) {
+  const m = text.match(new RegExp('<' + tag + '>([\\s\\S]*?)<\\/' + tag + '>'));
+  if (!m) return null;
+  try { return JSON.parse(m[1]); } catch(e) { return null; }
+}
+
+function cleanText(raw) {
+  return raw.replace(/<score>[\s\S]*?<\/score>/g, '').replace(/<final>[\s\S]*?<\/final>/g, '').trim();
+}
+
+async function callClaude(userMsg) {
+  state.messages.push({ role: 'user', content: userMsg });
+  showTyping();
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: SYSTEM_PROMPT,
+        messages: state.messages,
+      })
+    });
+    const data = await res.json();
+    const raw = data.content.map(i => i.text || '').join('');
+    state.messages.push({ role: 'assistant', content: raw });
+    removeTyping();
+    return raw;
+  } catch(e) {
+    removeTyping();
+    return 'Something went wrong. Please try again.';
+  }
+}
+
+async function handleAITurn(userMsg) {
+  clearInput();
+  if (userMsg) addBubble(userMsg, 'user');
+  const raw = await callClaude(userMsg);
+  const scoreData = parseBlock(raw, 'score');
+  const finalData = parseBlock(raw, 'final');
+  const display = cleanText(raw);
+  if (display) addBubble(display, 'ai');
+  if (finalData) { state.reportData = finalData; setTimeout(() => generateReport(finalData), 700); return; }
+  if (scoreData) {
+    state.deptScores[scoreData.dept] = scoreData;
+    state.currentDept = Math.min(state.currentDept + 1, DEPARTMENTS.length - 1);
+    updatePhase();
+  }
+  showTextInput(val => handleAITurn(val));
+}
+
+async function startAudit(name, biz) {
+  state.founderName = name;
+  state.bizContext = biz;
+  clearInput();
+  addBubble(name + ' — ' + biz, 'user');
+  const raw = await callClaude(`My name is ${name}. Here's my business: ${biz}. I'm ready to begin the full operational audit across all 9 areas.`);
+  const display = cleanText(raw);
+  if (display) addBubble(display, 'ai');
+  showTextInput(val => handleAITurn(val));
+}
+
+function generateReport(fd) {
+  document.getElementById('audit-body').style.display = 'none';
+  document.getElementById('report-wrap').style.display = 'block';
+  document.getElementById('rep-title').textContent = fd.title || 'Your operational snapshot';
+  document.getElementById('rep-sub').textContent = fd.subtitle || '';
+  const overall = Math.round(fd.overallScore || 5);
+  const ovEl = document.getElementById('ov-health');
+  ovEl.textContent = overall + '/10';
+  ovEl.className = 'score-tile-val ' + colorClass(overall);
+  document.getElementById('ov-risk').textContent = fd.highestRisk || '—';
+  document.getElementById('ov-opp').textContent = fd.biggestOpportunity || '—';
+  document.getElementById('strategic-diag').textContent = fd.strategicDiagnosis || '';
+  document.getElementById('ninety-day').textContent = fd.ninetyDay || '';
+  document.getElementById('courtney-bio').textContent = fd.courtneyBio || "Courtney Lindberg has spent her career doing one thing: helping founders build businesses that don't depend entirely on them. Her approach is simple — understand the business deeply, install the systems that create clarity, and leave every team more capable than she found it. She believes every founder deserves a business that truly serves them, and she shows up to help build exactly that.";
+  document.getElementById('cta-text').textContent = fd.ctaText || '';
+
+  const grid = document.getElementById('dept-grid');
+  grid.innerHTML = '';
+  DEPARTMENTS.forEach(dept => {
+    const sc = state.deptScores[dept.id];
+    if (!sc) return;
+    const color = sc.color || colorClass(sc.score);
+    const card = document.createElement('div');
+    card.className = 'dept-card';
+    card.innerHTML = `
+      <div class="dept-header" onclick="toggleDept(this)">
+        <div class="dept-icon ${color}">${dept.icon}</div>
+        <div class="dept-name">${dept.name}</div>
+        <div class="dept-score-pill ${color}">${sc.score}/10</div>
+        <div class="dept-chevron" id="chev-${dept.id}">▾</div>
+      </div>
+      <div class="dept-body" id="body-${dept.id}">
+        <div class="dept-score-bar-wrap">
+          <div class="dept-score-track"><div class="dept-score-fill ${color}" style="width:${sc.score*10}%"></div></div>
+        </div>
+        <div class="dept-analysis">${sc.analysis || ''}</div>
+        ${sc.cta ? `<div class="dept-cta">${sc.cta}</div>` : ''}
+      </div>`;
+    grid.appendChild(card);
+  });
+  window.scrollTo(0, 0);
+}
+
+function toggleDept(header) {
+  const body = header.nextElementSibling;
+  const id = body.id.replace('body-', '');
+  const chev = document.getElementById('chev-' + id);
+  body.classList.toggle('open');
+  if (chev) chev.classList.toggle('open');
+}
+
+function sendReport() {
+  const email = document.getElementById('sender-email').value.trim();
+  const scores = DEPARTMENTS.map(d => {
+    const sc = state.deptScores[d.id];
+    return sc ? `${d.name}: ${sc.score}/10\n${sc.analysis}` : '';
+  }).filter(Boolean).join('\n\n');
+  const fd = state.reportData || {};
+  const subject = encodeURIComponent('Operational audit — ' + state.founderName);
+  const body = encodeURIComponent(
+    `Hi Courtney,\n\nHere is my full operational audit.\n\nBUSINESS: ${state.bizContext}\n\n` +
+    `HEADLINE: ${fd.title || ''}\n${fd.subtitle || ''}\n\n` +
+    `OVERALL SCORE: ${fd.overallScore || ''}/10\nHIGHEST RISK: ${fd.highestRisk || ''}\nBIGGEST OPPORTUNITY: ${fd.biggestOpportunity || ''}\n\n` +
+    `DEPARTMENT SCORES\n${scores}\n\nSTRATEGIC DIAGNOSIS\n${fd.strategicDiagnosis || ''}\n\n90-DAY PRIORITY\n${fd.ninetyDay || ''}\n\nMy email: ${email}`
+  );
+  window.location.href = `mailto:courtney.lindberg@gmail.com?subject=${subject}&body=${body}`;
+  document.getElementById('report-wrap').style.display = 'none';
+  document.getElementById('thankyou').style.display = 'block';
+}
+
+buildPhaseDots();
+updatePhase();
+
+setTimeout(() => {
+  addBubble("Welcome. I'm glad you're here — taking a real look at how your business operates takes intention, and that already says something about how you lead.\n\nThis audit will walk us through every major area of your business. I'll ask questions, listen carefully, and reflect back what I'm seeing as we go. By the end, you'll have a clear, honest picture of where things stand — and where to focus first.\n\nLet's start with the basics.", 'ai');
+  showNameInput((name, biz) => startAudit(name, biz));
+}, 400);
+</script>
+</body>
+</html>
